@@ -1,25 +1,22 @@
 mod wgpuinit;
 use wgpuinit::{ run, Vertex };
 
-static mut gChunk: Vec<Vec<f32>> = vec![];
-
-
-unsafe fn main() {
-    gChunk = create_chunk();
-    //paint_antialiased_filled_circle(&mut gChunk, 7.0, 7.0, 5.0);
-    //paint_antialiased_filled_circle(&mut gChunk, 3.0, 3.0, 2.0);
-    //paint_antialiased_filled_circle(&mut gChunk, 10.0, 4.0, 3.0);
-    //paint_antialiased_filled_circle(&mut gChunk, 16.0, 16.0, 12.0);
-    //paint_antialiased_filled_circle(&mut gChunk, 15.0, 25.0, 6.0);
-    //print_chunk(&gChunk);
-    //chunk_to_image(&gChunk);
-        let tuple = process(&gChunk);
-        pollster::block_on(run(&tuple.0, &tuple.1, || unsafe{mouse_event}));
+fn main() {
+    let mut chunk = create_chunk();
+    paint_antialiased_filled_circle(&mut chunk, 7.0, 7.0, 5.0);
+    paint_antialiased_filled_circle(&mut chunk, 3.0, 3.0, 2.0);
+    paint_antialiased_filled_circle(&mut chunk, 10.0, 4.0, 3.0);
+    paint_antialiased_filled_circle(&mut chunk, 16.0, 16.0, 12.0);
+    paint_antialiased_filled_circle(&mut chunk, 15.0, 25.0, 6.0);
+    print_chunk(&chunk);
+    chunk_to_image(&chunk);
+    
+    let tuple = process(&chunk);
+    pollster::block_on(run(&tuple.0, &tuple.1, mouse_event));
 }
 
-pub unsafe fn mouse_event(pos: (f32, f32)) -> () {
-    paint_antialiased_filled_circle(&mut gChunk, pos.0, pos.1, 3.0);
-    //print!("{0}, {1}", pos.0, pos.1);
+pub fn mouse_event(pos: (f32, f32)) -> () {
+    print!("{0}, {1}", pos.0, pos.1);
 }
 
 //fn test(chunk: &mut Vec<Vec<f32>>, x: f32, y:f32) -> impl Fn(f32, f32) -> () {
@@ -113,7 +110,7 @@ fn set_to_vertices(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
     let at = set.a > 0.5;
 
     if set.a == 1.0 {
-        return(vec![
+        return((vec![
             Vertex { position: [0.0, 0.0, 0.0], colour: [colour, colour, colour]},
             Vertex { position: [1.0, 0.0, 0.0], colour: [colour, colour, colour]},
             Vertex { position: [0.0, 1.0, 0.0], colour: [colour, colour, colour]},
@@ -122,11 +119,11 @@ fn set_to_vertices(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
         vec![
             0, 1, 2,
             1, 3, 2
-        ]);
+        ]));
     }
     
     if set.a == 1.0 {
-        return(vec![
+        return((vec![
             Vertex { position: [0.0, 0.0, 0.0], colour: [colour, colour, colour]},
             Vertex { position: [1.0, 0.0, 0.0], colour: [colour, colour, colour]},
             Vertex { position: [0.0, 1.0, 0.0], colour: [colour, colour, colour]},
@@ -135,7 +132,7 @@ fn set_to_vertices(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
         vec![
             0, 1, 2,
             1, 3, 2
-        ]);
+        ]));
     }
     (vec![], vec![])
 }
@@ -148,38 +145,43 @@ fn set_to_vertices(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
 //   ..   ..    .#   #.   ##
 
 fn check_pattern_1(set: &SquareSet, cutoff: f32) -> bool {
-    return set.a >  cutoff
+    return(set.a >  cutoff
         && set.b <= cutoff
         && set.c <= cutoff
         && set.d <= cutoff
+    )
 }
 
 fn check_pattern_2(set: &SquareSet, cutoff: f32) -> bool {
-    return set.a >  cutoff
+    return(set.a >  cutoff
         && set.b >  cutoff
         && set.c <= cutoff
         && set.d <= cutoff
+    )
 }
 
 fn check_pattern_3(set: &SquareSet, cutoff: f32) -> bool {
-    return set.a >  cutoff
+    return(set.a >  cutoff
         && set.b <= cutoff
         && set.c <= cutoff
         && set.d >  cutoff
+    )
 }
 
 fn check_pattern_4(set: &SquareSet, cutoff: f32) -> bool {
-    return set.a >  cutoff
+    return(set.a >  cutoff
         && set.b >  cutoff
         && set.c >  cutoff
         && set.d <= cutoff
+    )
 }
 
 fn check_pattern_5(set: &SquareSet, cutoff: f32) -> bool {
-    return set.a >= cutoff
+    return(set.a >= cutoff
         && set.b >= cutoff
         && set.c >= cutoff
         && set.d >= cutoff
+    )
 }
 
 fn smooth(i: f32) -> f32 {
@@ -482,7 +484,7 @@ fn paint_antialiased_filled_circle(chunk: &mut Vec<Vec<f32>>, x: f32, y: f32, ra
 
     for i in 0..len1 {
         for j in 0..len1 {
-            let distance_squared = (i as f32 - x).powf(2.0) + (j as f32 - y).powf(2.0);
+            let distance_squared = ((i as f32 - x).powf(2.0) + (j as f32 - y).powf(2.0));
 
             if distance_squared <= radius_squared {
                 let distance = distance_squared.sqrt();
