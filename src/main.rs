@@ -1,5 +1,9 @@
 mod wgpuinit;
 use wgpuinit::{ run, Vertex };
+mod chunk;
+use chunk::Chunk;
+mod square_march;
+use square_march::SquareSet;
 
 fn main() {
     let mut chunk = create_chunk();
@@ -12,25 +16,23 @@ fn main() {
     chunk_to_image(&chunk);
     
     let tuple = process(&chunk);
+
+    let test: Vec<Vec<Vec<f32>>> = chunk.windows(2).map(|square_set| square_set.iter().map(|row| row.iter().map(|value| *value).collect()).collect()).collect();//.map(|row| row.map(||))
+    //test.map(|x| )
+    println!("{0} {1}\n{2} {3}", test[0][0][0], test[0][1][0], test[0][0][1], test[0][1][1]);
     pollster::block_on(run(&tuple.0, &tuple.1, mouse_event));
 }
 
-pub fn mouse_event(pos: (f32, f32)) -> () {
-    print!("{0}, {1}", pos.0, pos.1);
+pub fn mouse_event(_pos: (f32, f32)) -> () {
+    //print!("{0}, {1}", pos.0, pos.1);
 }
 
-//fn test(chunk: &mut Vec<Vec<f32>>, x: f32, y:f32) -> impl Fn(f32, f32) -> () {
-//    return(move |x, y| -> () {
-//        paint_antialiased_filled_circle(chunk, x, y, 5.0);
-//    })
+//#[repr(C)]
+//#[derive(Copy, Clone)]
+//struct SquareSet {
+//    a: f32, b: f32,
+//    c: f32, d: f32,
 //}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct SquareSet {
-    a: f32, b: f32,
-    c: f32, d: f32,
-}
 
 fn process(chunk: &Vec<Vec<f32>>) -> (Vec<Vertex>, Vec<i16>){
     let mut vertex_results: Vec<Vertex> = vec![];
@@ -42,7 +44,7 @@ fn process(chunk: &Vec<Vec<f32>>) -> (Vec<Vertex>, Vec<i16>){
     let mut totalindex: i16 = 0;
 
     for item in input {
-        let mapped_items = indextransform(set_to_vertices2(item), i, totalindex);
+        let mapped_items = indextransform(set_to_vertices(item), i, totalindex);
 
         let size = mapped_items.0.len();
         vertex_results.extend(mapped_items.0);
@@ -55,7 +57,7 @@ fn process(chunk: &Vec<Vec<f32>>) -> (Vec<Vertex>, Vec<i16>){
     (vertex_results, index_results)
 }
 
-fn indextransform(tuple: (Vec<Vertex>, Vec<i16>), index: i32, totalIndex: i16) -> (Vec<Vertex>, Vec<i16>) {
+fn indextransform(tuple: (Vec<Vertex>, Vec<i16>), index: i32, total_index: i16) -> (Vec<Vertex>, Vec<i16>) {
     let scale = 31;
     let x = index % scale;
     let y = index / scale;
@@ -77,7 +79,7 @@ fn indextransform(tuple: (Vec<Vertex>, Vec<i16>), index: i32, totalIndex: i16) -
     let mut new_indices: Vec<i16> = vec![];
 
     for index in tuple.1 {
-        let new_index = index + totalIndex;
+        let new_index = index + total_index;
         new_indices.push(new_index);
     }
 
@@ -104,39 +106,6 @@ fn chunk_to_square_sets(chunk: &Vec<Vec<f32>>) -> Vec<SquareSet> {
     square_sets
 }
 
-fn set_to_vertices(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
-    let colour = (set.a + set.b + set.c + set.d) / 4.0;
-
-    let at = set.a > 0.5;
-
-    if set.a == 1.0 {
-        return((vec![
-            Vertex { position: [0.0, 0.0, 0.0], colour: [colour, colour, colour]},
-            Vertex { position: [1.0, 0.0, 0.0], colour: [colour, colour, colour]},
-            Vertex { position: [0.0, 1.0, 0.0], colour: [colour, colour, colour]},
-            Vertex { position: [1.0, 1.0, 0.0], colour: [colour, colour, colour]},
-        ],
-        vec![
-            0, 1, 2,
-            1, 3, 2
-        ]));
-    }
-    
-    if set.a == 1.0 {
-        return((vec![
-            Vertex { position: [0.0, 0.0, 0.0], colour: [colour, colour, colour]},
-            Vertex { position: [1.0, 0.0, 0.0], colour: [colour, colour, colour]},
-            Vertex { position: [0.0, 1.0, 0.0], colour: [colour, colour, colour]},
-            Vertex { position: [1.0, 1.0, 0.0], colour: [colour, colour, colour]},
-        ],
-        vec![
-            0, 1, 2,
-            1, 3, 2
-        ]));
-    }
-    (vec![], vec![])
-}
-
 // a b
 // c d
 //
@@ -145,43 +114,38 @@ fn set_to_vertices(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
 //   ..   ..    .#   #.   ##
 
 fn check_pattern_1(set: &SquareSet, cutoff: f32) -> bool {
-    return(set.a >  cutoff
+    return set.a >  cutoff
         && set.b <= cutoff
         && set.c <= cutoff
         && set.d <= cutoff
-    )
 }
 
 fn check_pattern_2(set: &SquareSet, cutoff: f32) -> bool {
-    return(set.a >  cutoff
+    return set.a >  cutoff
         && set.b >  cutoff
         && set.c <= cutoff
         && set.d <= cutoff
-    )
 }
 
 fn check_pattern_3(set: &SquareSet, cutoff: f32) -> bool {
-    return(set.a >  cutoff
+    return set.a >  cutoff
         && set.b <= cutoff
         && set.c <= cutoff
         && set.d >  cutoff
-    )
 }
 
 fn check_pattern_4(set: &SquareSet, cutoff: f32) -> bool {
-    return(set.a >  cutoff
+    return set.a >  cutoff
         && set.b >  cutoff
         && set.c >  cutoff
         && set.d <= cutoff
-    )
 }
 
 fn check_pattern_5(set: &SquareSet, cutoff: f32) -> bool {
-    return(set.a >= cutoff
+    return set.a >= cutoff
         && set.b >= cutoff
         && set.c >= cutoff
         && set.d >= cutoff
-    )
 }
 
 fn smooth(i: f32) -> f32 {
@@ -292,7 +256,7 @@ fn pattern_4(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
     ])
 }
 
-fn pattern_5(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
+fn pattern_5(_set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
     return (vec![
         Vertex { position: [-0.5, -0.5, 0.0], colour: [0.0, 0.0, 0.0] },
         Vertex { position: [0.5, -0.5, 0.0], colour: [0.0, 0.0, 0.0] },
@@ -306,7 +270,7 @@ fn pattern_5(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
 
 fn rotate_pattern(pattern: (Vec<Vertex>, Vec<i16>), index: i32) -> (Vec<Vertex>, Vec<i16>) {
     let mut rotation = pattern;
-    for i in 0..index {
+    for _ in 0..index {
         let mut new_vertices: Vec<Vertex> = vec![];
     
         for vertex in rotation.0 {
@@ -322,7 +286,7 @@ fn rotate_pattern(pattern: (Vec<Vertex>, Vec<i16>), index: i32) -> (Vec<Vertex>,
     rotation
 }
 
-fn set_to_vertices2(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
+fn set_to_vertices(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
     // Rotations:
     // 1)ab 2)ca 3)dc 4)bd
     //   cd   db   ba   ac
@@ -343,15 +307,15 @@ fn set_to_vertices2(set: SquareSet) -> (Vec<Vertex>, Vec<i16>) {
         match output {
             Some(x) => {
                 let rotate = rotate_pattern(x.clone(), i);
-                println!("init: {0}, \t{1}\n      {2}, \t{3}", set.a, set.b, set.c, set.d);
-                println!("rota: {0}, \t{1}\n      {2}, \t{3}", rotation.a, rotation.b, rotation.c, rotation.d);
+                //println!("init: {0}, \t{1}\n      {2}, \t{3}", set.a, set.b, set.c, set.d);
+                //println!("rota: {0}, \t{1}\n      {2}, \t{3}", rotation.a, rotation.b, rotation.c, rotation.d);
 
-                for vertex in &x.0 {
-                    println!("normal: [{0}, {1}, {2}]", vertex.position[0], vertex.position[1], vertex.position[2]);
+                for _vertex in &x.0 {
+                    //println!("normal: [{0}, {1}, {2}]", vertex.position[0], vertex.position[1], vertex.position[2]);
                 }
                 
-                for vertex in &rotate.0 {
-                    println!("rotate: [{0}, {1}, {2}]", vertex.position[0], vertex.position[1], vertex.position[2]);
+                for _vertex in &rotate.0 {
+                    //println!("rotate: [{0}, {1}, {2}]", vertex.position[0], vertex.position[1], vertex.position[2]);
                 }
 
                 return rotate
@@ -484,7 +448,7 @@ fn paint_antialiased_filled_circle(chunk: &mut Vec<Vec<f32>>, x: f32, y: f32, ra
 
     for i in 0..len1 {
         for j in 0..len1 {
-            let distance_squared = ((i as f32 - x).powf(2.0) + (j as f32 - y).powf(2.0));
+            let distance_squared = (i as f32 - x).powf(2.0) + (j as f32 - y).powf(2.0);
 
             if distance_squared <= radius_squared {
                 let distance = distance_squared.sqrt();

@@ -185,7 +185,7 @@ impl State {
         }
     }
 
-    fn input(&mut self, event: &WindowEvent) -> bool {
+    fn input(&mut self, _event: &WindowEvent) -> bool {
         false
     }
 
@@ -214,7 +214,7 @@ impl State {
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let keys = self.device_state.get_keys();
+        let _keys = self.device_state.get_keys();
         let mouse = self.device_state.get_mouse();
 
         let window_pos = match self.window.inner_position() {
@@ -224,14 +224,13 @@ impl State {
 
         let window_size = match self.window.inner_size() {
             i => (i.width as f32, i.height as f32),
-            _ => (0.0, 0.0)
         };
 
-        let mouse_pos = (((mouse.coords.0 as f32 - window_pos.0)/(window_size.0)), ((mouse.coords.1 as f32 - window_pos.1)/(window_size.1)));
+        let _mouse_pos = (((mouse.coords.0 as f32 - window_pos.0)/(window_size.0)), ((mouse.coords.1 as f32 - window_pos.1)/(window_size.1)));
         
         if ((mouse.coords.0 as f32) <= window_pos.0 + window_size.0) && (mouse.coords.0 as f32 >= window_pos.0)
         && ((mouse.coords.1 as f32) <= window_pos.1 + window_size.1) && (mouse.coords.1 as f32 >= window_pos.1) {
-            println!("mouse: {0}, {1}", mouse_pos.0, mouse_pos.1);
+            //println!("mouse: {0}, {1}", mouse_pos.0, mouse_pos.1);
         }
 
         let output = self.surface.get_current_texture()?;
@@ -284,7 +283,6 @@ impl State {
 
         let window_size = match self.window.inner_size() {
             i => (i.width as f32, i.height as f32),
-            _ => (0.0, 0.0)
         };
 
         (((mouse.coords.0 as f32 - window_pos.0)/(window_size.0)), ((mouse.coords.1 as f32 - window_pos.1)/(window_size.1)))
@@ -300,8 +298,6 @@ where
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     
     let mut state = State::new(window).await;
-    let mut w = 0;
-    let mut h = 0;
     
     state.update(vertices, indices);
     
