@@ -6,6 +6,7 @@ use winit::{
 use winit::window::Window;
 use wgpu::util::DeviceExt;
 use device_query::{DeviceState, DeviceQuery};
+use crate::{ Vertex, Plane, ReferencePoint };
 
 struct State {
     surface: wgpu::Surface,
@@ -19,6 +20,9 @@ struct State {
     // unsafe references to the window's resources.
     window: Window,
 
+    plane: Plane,
+    ref_point: ReferencePoint,
+
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -27,7 +31,11 @@ struct State {
 
 impl State {
     // Creating some of the wgpu types requires async code
-    async fn new(window: Window) -> Self {
+    async fn new(window: Window, plane: Plane, ref_point: ReferencePoint) -> Self {
+        let mesh = plane.mesh_from_ref(&ref_point);
+        
+        let vertices: &[Vertex] = &mesh.vertices;
+        let indices: &[i16] = &mesh.indices;
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -43,13 +51,14 @@ impl State {
         // State owns the window so this should be safe.
         let surface = unsafe { instance.create_surface(&window) }.unwrap();
 
-        let adapter = instance.request_adapter(
-            &wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
-                compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
-            },
-        ).await.unwrap();
+        let adapter = instance
+    .enumerate_adapters(wgpu::Backends::all())
+    .find(|adapter| {
+        // Check if this adapter supports our surface
+        adapter.is_surface_supported(&surface)
+    })
+    .unwrap();
+
 
         let (device, queue) = adapter.request_device(
             &wgpu::DeviceDescriptor {
@@ -142,7 +151,7 @@ impl State {
         let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Vertex Buffer"),
-                contents: bytemuck::cast_slice(VERTICES),
+                contents: bytemuck::cast_slice(vertices),
                 usage: wgpu::BufferUsages::VERTEX,
             }
         );
@@ -150,12 +159,12 @@ impl State {
         let index_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Index Buffer"),
-                contents: bytemuck::cast_slice(INDICES),
+                contents: bytemuck::cast_slice(indices),
                 usage: wgpu::BufferUsages::INDEX,
             }
         );
 
-        let num_indices = INDICES.len() as u32;
+        let num_indices = indices.len() as u32;
 
         Self {
             window,
@@ -165,6 +174,8 @@ impl State {
             queue,
             config,
             size,
+            plane,
+            ref_point,
             render_pipeline,
             vertex_buffer,
             index_buffer,
@@ -185,11 +196,54 @@ impl State {
         }
     }
 
-    fn input(&mut self, _event: &WindowEvent) -> bool {
-        false
+    fn input(&mut self, event: &WindowEvent) -> bool {
+        match event {
+            WindowEvent::KeyboardInput {
+                input: KeyboardInput {
+                    state: ElementState::Pressed,
+                    virtual_keycode: Some(virtual_keycode),..
+                },..
+            } => match virtual_keycode {
+                VirtualKeyCode::Up => {
+                    self.ref_point.position = (self.ref_point.position.0, self.ref_point.position.1 + 1.0);
+                    self.update();
+                    true
+                },
+                VirtualKeyCode::Right => {
+                    self.ref_point.position = (self.ref_point.position.0 + 1.0, self.ref_point.position.1);
+                    self.update();
+                    true
+                },
+                VirtualKeyCode::Down => {
+                    self.ref_point.position = (self.ref_point.position.0, self.ref_point.position.1 - 1.0);
+                    self.update();
+                    true
+                },
+                VirtualKeyCode::Left => {
+                    self.ref_point.position = (self.ref_point.position.0 - 1.0, self.ref_point.position.1);
+                    self.update();
+                    true
+                },
+                _ => false
+                //println!("state: {0}, key: {1}", *state == ElementState::Pressed, match virtual_keycode {
+                //    VirtualKeyCode::Up => "up_key",
+                //    _ => "unkn"
+                //});
+            },
+            _ => return false
+        }
     }
 
-    fn update(&mut self, vertices: &[Vertex], indices: &[i16]) {
+    fn update(&mut self) {
+        self.plane.paint_antialiased_filled_circle(self.ref_point.position.1, self.ref_point.position.0, 3.0);
+        println!("{}", self.ref_point.position.1);
+        let mut mesh = self.plane.mesh_from_ref(&self.ref_point);
+
+        //mesh.scale(0.25);
+        
+        let vertices: &[Vertex] = &mesh.vertices;
+        let indices: &[i16] = &mesh.indices;
+
         let vertex_buffer = self.device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Vertex Buffer"),
@@ -289,17 +343,24 @@ impl State {
     }
 }
 
-pub async fn run<F>(vertices: &[Vertex], indices: &[i16], mouse_event_fn: F)
-where 
-    F: Fn((f32, f32)) -> () + Send + 'static
-{
+pub async fn run(plane: Plane) {
     env_logger::init();
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
+
+    let reference = ReferencePoint {
+        position: (0.0, 0.0),
+        render_dist: 32.0
+    };
+
+    //let mesh = plane.mesh_from_ref(reference);
+
+    //let vertices: &[Vertex] = &mesh.vertices;
+    //let indices: &[i16] = &mesh.indices;
     
-    let mut state = State::new(window).await;
-    
-    state.update(vertices, indices);
+    let mut state = State::new(window, plane, reference).await;
+
+    //state.update(vertices, indices);
     
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -342,30 +403,12 @@ where
             Event::MainEventsCleared => {
                 // RedrawRequested will only trigger once, unless we manually
                 // request it.
-                mouse_event_fn(state.mouse_pos());
                 state.window().request_redraw();
             }
             _ => {}
         }
     });
 }
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct Vertex {
-    pub position: [f32; 3],
-    pub colour: [f32; 3],
-}
-
-const VERTICES: &[Vertex] = &[
-    Vertex { position: [-0.0868241, 0.49240386, 0.0], colour: [0.5, 0.0, 0.5] }, // A
-    Vertex { position: [-0.49513406, 0.06958647, 0.0], colour: [0.5, 0.0, 0.5] }, // B
-    Vertex { position: [-0.21918549, -0.44939706, 0.0], colour: [0.5, 0.0, 0.5] }, // C
-];
-
-const INDICES: &[u16] = &[
-    0, 1, 2,
-];
 
 impl Vertex {
     fn desc() -> wgpu::VertexBufferLayout<'static> {
